@@ -11,10 +11,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.objenesis.Objenesis;
-import org.objenesis.ObjenesisStd;
-import org.spigotmc.SpigotWorldConfig;
-import org.spigotmc.TickLimiter;
 
 import java.util.*;
 
@@ -69,13 +65,13 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 			if (resourcekey != WorldDimension.OVERWORLD) {
 				ResourceKey<World> resourcekey1 = ResourceKey.a(IRegistry.L, resourcekey.a());
 				DimensionManager dimensionmanager1 = entry.getValue().b();
-				ChunkGenerator chunkgenerator = entry.getValue().c();
-				SecondaryWorldData secondaryworlddata = new SecondaryWorldData(saveData, iworlddataserver);
+				ChunkGenerator chunkgenerator = entry.getValue().c(); //TODO: Shade
+				var data = DimensionWorldData.create((WorldDataServer) iworlddataserver, "dream_dimension", EnumGamemode.CREATIVE);
 				WorldServer worldserver1 = new WorldServer(console, console.executorService, console.convertable,
-						secondaryworlddata, resourcekey1, dimensionmanager1, worldloadlistener, chunkgenerator,
+						data, resourcekey1, dimensionmanager1, worldloadlistener, chunkgenerator,
 						false, //isDebugWorld
 						BiomeManager.a(mainWorld.getSeed()), //Biome seed
-						ImmutableList.of(), false, org.bukkit.World.Environment.NORMAL, null, secondaryworlddata.getName());
+						ImmutableList.of(), false, org.bukkit.World.Environment.NORMAL, null);
 
 				((CraftWorld) mainWorld).getHandle().getWorldBorder().a(new IWorldBorderListener.a(worldserver1.getWorldBorder()));
 				console.worldServer.put(resourcekey1, worldserver1);
