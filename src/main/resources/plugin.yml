@@ -1,5 +1,4 @@
 name: CustomDimensions
 main: buttondevteam.customdimensions.CustomDimensions
 version: '1.0'
-load: STARTUP
 api-version: '1.16'

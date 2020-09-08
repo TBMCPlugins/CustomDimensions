@@ -1,17 +1,18 @@
 package buttondevteam.customdimensions;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.mojang.serialization.Lifecycle;
 import net.minecraft.server.v1_16_R2.*;
 import org.bukkit.Bukkit;
-import org.bukkit.command.CommandSender;
+import org.bukkit.WorldType;
 import org.bukkit.craftbukkit.v1_16_R2.CraftServer;
-import org.bukkit.craftbukkit.v1_16_R2.CraftWorld;
-import org.bukkit.craftbukkit.v1_16_R2.SpigotTimings;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.world.WorldInitEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.util.*;
 
 public class CustomDimensions extends JavaPlugin implements Listener {
@@ -27,20 +28,14 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
-		Bukkit.getPluginManager().registerEvents(this, this);
-	}
-
-	@EventHandler
-	public void worldLoad(WorldLoadEvent event) {
-		System.out.println("World loaded: " + event.getWorld().getName());
-		if (!event.getWorld().getName().equals(Bukkit.getWorlds().get(0).getName()))
-			return;
-		System.out.println("Main world");
+		//Bukkit.getPluginManager().registerEvents(this, this);
+		getLogger().info("Loading custom dimensions...");
 		try {
 			load();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		getLogger().info("Finished loading custom dimensions!");
 	}
 
 	public void load() throws Exception {
@@ -49,7 +44,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		var field = console.getClass().getSuperclass().getDeclaredField("saveData");
 		field.setAccessible(true);
 		var saveData = (SaveData) field.get(console);
-		IWorldDataServer iworlddataserver = saveData.H();
+		//IWorldDataServer iworlddataserver = saveData.H();
 		GeneratorSettings generatorsettings = saveData.getGeneratorSettings();
 		RegistryMaterials<WorldDimension> registrymaterials = generatorsettings.d();
 		var worldloadlistener = console.worldLoadListenerFactory.create(11);
@@ -58,23 +53,84 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 
 		var mainWorld = Bukkit.getWorlds().get(0);
 
+		var convertable = Convertable.a(Bukkit.getWorldContainer().toPath());
+
 		while (iterator.hasNext()) {
 			Map.Entry<ResourceKey<WorldDimension>, WorldDimension> entry = iterator.next();
 			ResourceKey<WorldDimension> resourcekey = entry.getKey();
 
-			if (resourcekey != WorldDimension.OVERWORLD) {
+			if (resourcekey != WorldDimension.OVERWORLD
+					&& resourcekey != WorldDimension.THE_NETHER
+					&& resourcekey != WorldDimension.THE_END) {
 				ResourceKey<World> resourcekey1 = ResourceKey.a(IRegistry.L, resourcekey.a());
-				DimensionManager dimensionmanager1 = entry.getValue().b();
+				DimensionManager dimensionmanager = entry.getValue().b();
 				ChunkGenerator chunkgenerator = entry.getValue().c(); //TODO: Shade
-				var data = DimensionWorldData.create((WorldDataServer) iworlddataserver, "dream_dimension", EnumGamemode.CREATIVE);
-				WorldServer worldserver1 = new WorldServer(console, console.executorService, console.convertable,
-						data, resourcekey1, dimensionmanager1, worldloadlistener, chunkgenerator,
+				var name = resourcekey.a().getKey();
+				var session = convertable.new ConversionSession(name, resourcekey) { //The original session isn't prepared for custom dimensions
+					@Override
+					public File a(ResourceKey<World> resourcekey) {
+						return new File(this.folder.toFile(), "custom");
+					}
+				};
+				MinecraftServer.convertWorld(session);
+
+				//Load world settings and create a custom
+				RegistryReadOps<NBTBase> registryreadops = RegistryReadOps.a(DynamicOpsNBT.a, console.dataPackResources.h(), console.f);
+				WorldDataServer worlddata = (WorldDataServer) session.a(registryreadops, console.datapackconfiguration);
+				if (worlddata == null) {
+					Properties properties = new Properties();
+					properties.put("level-seed", Objects.toString(mainWorld.getSeed()));
+					properties.put("generate-structures", Objects.toString(true));
+					properties.put("level-type", WorldType.NORMAL.getName());
+					GeneratorSettings generatorsettings2 = GeneratorSettings.a(console.aX(), properties);
+					WorldSettings worldSettings = new WorldSettings(name,
+							EnumGamemode.getById(Bukkit.getDefaultGameMode().getValue()),
+							false, //Hardcore
+							EnumDifficulty.EASY, false, new GameRules(), console.datapackconfiguration);
+					worlddata = new WorldDataServer(worldSettings, generatorsettings2, Lifecycle.stable());
+				}
+
+				var data = DimensionWorldData.create(worlddata, name, EnumGamemode.CREATIVE);
+
+				worlddata.checkName(name);
+				worlddata.a(console.getServerModName(), console.getModded().isPresent());
+				if (console.options.has("forceUpgrade")) {
+					net.minecraft.server.v1_16_R2.Main.convertWorld(session, DataConverterRegistry.a(),
+							console.options.has("eraseCache"), () -> true,
+							worlddata.getGeneratorSettings().d().d().stream()
+									.map((entry2) -> ResourceKey.a(IRegistry.K, entry2.getKey().a()))
+									.collect(ImmutableSet.toImmutableSet()));
+				}
+
+				List<MobSpawner> list = ImmutableList.of(new MobSpawnerPhantom(), new MobSpawnerPatrol(), new MobSpawnerCat(), new VillageSiege(), new MobSpawnerTrader(worlddata));
+
+				//Register dimension manager in registry
+				ResourceKey<DimensionManager> dimManResKey = ResourceKey.a(IRegistry.K, resourcekey.a());
+				((RegistryMaterials<DimensionManager>) console.f.a()).a(dimManResKey, dimensionmanager, Lifecycle.stable());
+
+
+				//RegistryMaterials<WorldDimension> registrymaterials = worlddata.getGeneratorSettings().d();
+				//WorldDimension worlddimension = (WorldDimension) registrymaterials2.a(actualDimension);
+				//Use the main world's dimension data
+
+				WorldServer worldserver = new WorldServer(console, console.executorService, session,
+						data, resourcekey1, dimensionmanager, worldloadlistener, chunkgenerator,
 						false, //isDebugWorld
 						BiomeManager.a(mainWorld.getSeed()), //Biome seed
-						ImmutableList.of(), false, org.bukkit.World.Environment.NORMAL, null);
+						list, false, org.bukkit.World.Environment.NORMAL, null);
 
-				((CraftWorld) mainWorld).getHandle().getWorldBorder().a(new IWorldBorderListener.a(worldserver1.getWorldBorder()));
-				console.worldServer.put(resourcekey1, worldserver1);
+				//((CraftWorld) mainWorld).getHandle().getWorldBorder().a(new IWorldBorderListener.a(worldserver.getWorldBorder()));
+
+				if (Bukkit.getWorld(name.toLowerCase(Locale.ENGLISH)) == null) {
+					getLogger().warning("Failed to load custom dimension " + name);
+				} else {
+					console.initWorld(worldserver, worlddata, worlddata, worlddata.getGeneratorSettings());
+					worldserver.setSpawnFlags(true, true);
+					console.worldServer.put(worldserver.getDimensionKey(), worldserver);
+					Bukkit.getPluginManager().callEvent(new WorldInitEvent(worldserver.getWorld()));
+					console.loadSpawn(worldserver.getChunkProvider().playerChunkMap.worldLoadListener, worldserver);
+					Bukkit.getPluginManager().callEvent(new WorldLoadEvent(worldserver.getWorld()));
+				}
 			}
 		}
 		System.out.println("Loading finished!");
