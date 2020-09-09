@@ -1,7 +1,9 @@
 package buttondevteam.customdimensions;
 
 import com.mojang.serialization.Lifecycle;
-import net.minecraft.server.v1_16_R2.*;
+import net.minecraft.server.v1_16_R2.GeneratorSettings;
+import net.minecraft.server.v1_16_R2.WorldDataServer;
+import net.minecraft.server.v1_16_R2.WorldSettings;
 import org.mockito.Mockito;
 
 public class DimensionWorldData extends WorldDataServer {
@@ -9,13 +11,13 @@ public class DimensionWorldData extends WorldDataServer {
 		super(worldsettings, generatorsettings, lifecycle);
 	}
 
-	public static DimensionWorldData create(WorldDataServer data, String name, EnumGamemode gamemode) {
-		var mock = Mockito.mock(DimensionWorldData.class, invocation -> {
+	public static DimensionWorldData create(WorldDataServer data, String name) {
+		var mock = Mockito.mock(DimensionWorldData.class, Mockito.withSettings().defaultAnswer(invocation -> {
 			if (invocation.getMethod().getDeclaringClass() == DimensionWorldData.class)
 				return invocation.callRealMethod();
 			return invocation.getMethod().invoke(data, invocation.getArguments());
-		});
-		mock.b = new WorldSettings(name, gamemode, false, EnumDifficulty.EASY, true, data.q(), data.D());
+		}).stubOnly());
+		mock.b = new WorldSettings(name, data.getGameType(), false, data.getDifficulty(), true, data.q(), data.D());
 		return mock;
 	}
 }

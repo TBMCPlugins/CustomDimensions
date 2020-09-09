@@ -16,16 +16,6 @@ import java.io.File;
 import java.util.*;
 
 public class CustomDimensions extends JavaPlugin implements Listener {
-	/*@Command2.Subcommand
-	public void def(CommandSender sender, String name) {
-		*sender.sendMessage("Starting creation of " + name + "...");
-		var world = load();
-		if (world == null)
-			sender.sendMessage("Failed to load world.");
-		else
-			sender.sendMessage("World loaded! " + world.getName());*
-	}*/
-
 	@Override
 	public void onEnable() {
 		//Bukkit.getPluginManager().registerEvents(this, this);
@@ -39,34 +29,41 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 	}
 
 	public void load() throws Exception {
-		System.out.println("Loading...");
+		getLogger().info("Loading...");
 		var console = ((CraftServer) Bukkit.getServer()).getServer();
 		var field = console.getClass().getSuperclass().getDeclaredField("saveData");
 		field.setAccessible(true);
 		var saveData = (SaveData) field.get(console);
-		//IWorldDataServer iworlddataserver = saveData.H();
-		GeneratorSettings generatorsettings = saveData.getGeneratorSettings();
-		RegistryMaterials<WorldDimension> registrymaterials = generatorsettings.d();
-		var worldloadlistener = console.worldLoadListenerFactory.create(11);
+		GeneratorSettings mainGenSettings = saveData.getGeneratorSettings();
+		RegistryMaterials<WorldDimension> dimensionRegistry = mainGenSettings.d();
 
-		var iterator = registrymaterials.d().iterator();
+		var dimIterator = dimensionRegistry.d().iterator();
 
 		var mainWorld = Bukkit.getWorlds().get(0);
 
 		var convertable = Convertable.a(Bukkit.getWorldContainer().toPath());
 
-		while (iterator.hasNext()) {
-			Map.Entry<ResourceKey<WorldDimension>, WorldDimension> entry = iterator.next();
-			ResourceKey<WorldDimension> resourcekey = entry.getKey();
+		while (dimIterator.hasNext()) {
+			Map.Entry<ResourceKey<WorldDimension>, WorldDimension> dimEntry = dimIterator.next();
+			ResourceKey<WorldDimension> dimKey = dimEntry.getKey();
 
-			if (resourcekey != WorldDimension.OVERWORLD
-					&& resourcekey != WorldDimension.THE_NETHER
-					&& resourcekey != WorldDimension.THE_END) {
-				ResourceKey<World> resourcekey1 = ResourceKey.a(IRegistry.L, resourcekey.a());
-				DimensionManager dimensionmanager = entry.getValue().b();
-				ChunkGenerator chunkgenerator = entry.getValue().c(); //TODO: Shade
-				var name = resourcekey.a().getKey();
-				var session = convertable.new ConversionSession(name, resourcekey) { //The original session isn't prepared for custom dimensions
+			if (dimKey != WorldDimension.OVERWORLD
+					&& dimKey != WorldDimension.THE_NETHER
+					&& dimKey != WorldDimension.THE_END) {
+				System.out.println("First check");
+				for (var dimMan : console.f.a()) {
+					try {
+						System.out.println("Found dim man for key: " + console.f.a().getKey(dimMan));
+						System.out.println("Resource key: " + console.f.a().c(dimMan));
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+				ResourceKey<World> worldKey = ResourceKey.a(IRegistry.L, dimKey.a());
+				DimensionManager dimensionmanager = dimEntry.getValue().b();
+				ChunkGenerator chunkgenerator = dimEntry.getValue().c(); //TODO: Shade
+				var name = dimKey.a().getKey();
+				var session = convertable.new ConversionSession(name, dimKey) { //The original session isn't prepared for custom dimensions
 					@Override
 					public File a(ResourceKey<World> resourcekey) {
 						return new File(this.folder.toFile(), "custom");
@@ -74,7 +71,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 				};
 				MinecraftServer.convertWorld(session);
 
-				//Load world settings and create a custom
+				//Load world settings or create default values
 				RegistryReadOps<NBTBase> registryreadops = RegistryReadOps.a(DynamicOpsNBT.a, console.dataPackResources.h(), console.f);
 				WorldDataServer worlddata = (WorldDataServer) session.a(registryreadops, console.datapackconfiguration);
 				if (worlddata == null) {
@@ -82,15 +79,16 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 					properties.put("level-seed", Objects.toString(mainWorld.getSeed()));
 					properties.put("generate-structures", Objects.toString(true));
 					properties.put("level-type", WorldType.NORMAL.getName());
-					GeneratorSettings generatorsettings2 = GeneratorSettings.a(console.aX(), properties);
+					GeneratorSettings dimGenSettings = GeneratorSettings.a(console.aX(), properties);
 					WorldSettings worldSettings = new WorldSettings(name,
 							EnumGamemode.getById(Bukkit.getDefaultGameMode().getValue()),
 							false, //Hardcore
 							EnumDifficulty.EASY, false, new GameRules(), console.datapackconfiguration);
-					worlddata = new WorldDataServer(worldSettings, generatorsettings2, Lifecycle.stable());
+					worlddata = new WorldDataServer(worldSettings, dimGenSettings, Lifecycle.stable());
 				}
 
-				var data = DimensionWorldData.create(worlddata, name, EnumGamemode.CREATIVE);
+				//Create a custom WorldDataServer that is aware that it's a dimension and delegates most calls to the main world
+				var data = DimensionWorldData.create(worlddata, name);
 
 				worlddata.checkName(name);
 				worlddata.a(console.getServerModName(), console.getModded().isPresent());
@@ -102,22 +100,62 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 									.collect(ImmutableSet.toImmutableSet()));
 				}
 
-				List<MobSpawner> list = ImmutableList.of(new MobSpawnerPhantom(), new MobSpawnerPatrol(), new MobSpawnerCat(), new VillageSiege(), new MobSpawnerTrader(worlddata));
+				List<MobSpawner> spawners = ImmutableList.of(new MobSpawnerPhantom(), new MobSpawnerPatrol(), new MobSpawnerCat(), new VillageSiege(), new MobSpawnerTrader(worlddata));
 
-				//Register dimension manager in registry
-				ResourceKey<DimensionManager> dimManResKey = ResourceKey.a(IRegistry.K, resourcekey.a());
-				((RegistryMaterials<DimensionManager>) console.f.a()).a(dimManResKey, dimensionmanager, Lifecycle.stable());
+				//in bf but not in bi
+				System.out.println("Second check");
+				ResourceKey<DimensionManager> dimManKey = null;
+				int lastID = -1;
+				for (var dimMan : console.f.a()) {
+					try {
+						System.out.println("Found dim man for key: " + console.f.a().getKey(dimMan));
+						var key = console.f.a().c(dimMan);
+						System.out.println("Resource key: " + key);
+						int id = console.f.a().a(dimensionmanager);
+						System.out.println("ID: " + id);
+						if (id > lastID) lastID = id;
+						if (key.isPresent() && key.get().a().getKey().equals(name)) {
+							//Register dimension manager in registry
+							//var originalManagerID = console.f.a().a(dimensionmanager); - -1
+							//System.out.println("Replacing dimension manager with ID " + originalManagerID);
+							dimManKey = key.get();
+						}
 
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+				if (dimManKey != null) {
+					ResourceKey<DimensionManager> dimManResKey = ResourceKey.a(IRegistry.K, dimKey.a());
+					System.out.println("Replacing with " + dimManResKey);
+					((RegistryMaterials<DimensionManager>) console.f.a()).a(OptionalInt.empty(), dimManKey, dimensionmanager, Lifecycle.stable());
+				}
+
+				//in bf but not in bi
+				System.out.println("Third check");
+				for (var dimMan : console.f.a()) {
+					try {
+						System.out.println("Found dim man for key: " + console.f.a().getKey(dimMan));
+						System.out.println("Resource key: " + console.f.a().c(dimMan));
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+				var worldloadlistener = console.worldLoadListenerFactory.create(11);
 
 				//RegistryMaterials<WorldDimension> registrymaterials = worlddata.getGeneratorSettings().d();
 				//WorldDimension worlddimension = (WorldDimension) registrymaterials2.a(actualDimension);
 				//Use the main world's dimension data
 
 				WorldServer worldserver = new WorldServer(console, console.executorService, session,
-						data, resourcekey1, dimensionmanager, worldloadlistener, chunkgenerator,
+						data, worldKey, dimensionmanager, worldloadlistener, chunkgenerator,
 						false, //isDebugWorld
 						BiomeManager.a(mainWorld.getSeed()), //Biome seed
-						list, false, org.bukkit.World.Environment.NORMAL, null);
+						spawners, false, org.bukkit.World.Environment.NORMAL, null);
+				data.world = worldserver; //Mocked world data
+				worlddata.world = worldserver; //Inner world data
 
 				//((CraftWorld) mainWorld).getHandle().getWorldBorder().a(new IWorldBorderListener.a(worldserver.getWorldBorder()));
 
@@ -133,7 +171,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 				}
 			}
 		}
-		System.out.println("Loading finished!");
+		getLogger().info("Loading finished!");
 	}
 
 	/*private WorldServer createWorldServer(WorldDataMutable worldData, String name) throws Exception {
