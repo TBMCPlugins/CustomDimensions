@@ -2,3 +2,5 @@ name: CustomDimensions
 main: buttondevteam.customdimensions.CustomDimensions
 version: '1.0'
 api-version: '1.16'
+loadbefore:
+  - Multiverse-Core
