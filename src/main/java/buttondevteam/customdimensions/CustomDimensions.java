@@ -28,7 +28,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		getLogger().info("Finished loading custom dimensions!");
 	}
 
-	public void load() throws Exception {
+	private void load() throws Exception {
 		var console = ((CraftServer) Bukkit.getServer()).getServer();
 		var field = console.getClass().getSuperclass().getDeclaredField("saveData");
 		field.setAccessible(true);
@@ -63,14 +63,14 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 				MinecraftServer.convertWorld(session);
 
 				//Load world settings or create default values
-				RegistryReadOps<NBTBase> registryreadops = RegistryReadOps.a(DynamicOpsNBT.a, console.dataPackResources.h(), console.f);
+				RegistryReadOps<NBTBase> registryreadops = RegistryReadOps.a(DynamicOpsNBT.a, console.dataPackResources.h(), console.customRegistry);
 				WorldDataServer worlddata = (WorldDataServer) session.a(registryreadops, console.datapackconfiguration);
 				if (worlddata == null) {
 					Properties properties = new Properties();
 					properties.put("level-seed", Objects.toString(mainWorld.getSeed()));
 					properties.put("generate-structures", Objects.toString(true));
 					properties.put("level-type", WorldType.NORMAL.getName());
-					GeneratorSettings dimGenSettings = GeneratorSettings.a(console.aX(), properties);
+					GeneratorSettings dimGenSettings = GeneratorSettings.a(console.getCustomRegistry(), properties);
 					WorldSettings worldSettings = new WorldSettings(name,
 							EnumGamemode.getById(Bukkit.getDefaultGameMode().getValue()),
 							false, //Hardcore
@@ -92,7 +92,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 
 				ResourceKey<DimensionManager> dimManResKey = ResourceKey.a(IRegistry.K, dimKey.a());
 				//Replace existing dimension manager, correctly setting the ID up (which is -1 for default worlds...)
-				((RegistryMaterials<DimensionManager>) console.f.a()).a(OptionalInt.empty(), dimManResKey, dimensionmanager, Lifecycle.stable());
+				((RegistryMaterials<DimensionManager>) console.customRegistry.a()).a(OptionalInt.empty(), dimManResKey, dimensionmanager, Lifecycle.stable());
 
 				var worldloadlistener = console.worldLoadListenerFactory.create(11);
 
