@@ -91,8 +91,16 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 				List<MobSpawner> spawners = ImmutableList.of(new MobSpawnerPhantom(), new MobSpawnerPatrol(), new MobSpawnerCat(), new VillageSiege(), new MobSpawnerTrader(worlddata));
 
 				ResourceKey<DimensionManager> dimManResKey = ResourceKey.a(IRegistry.K, dimKey.a());
+				var dimRegistry = ((RegistryMaterials<DimensionManager>) console.customRegistry.a());
+				{
+					var key = dimRegistry.getKey(dimensionmanager);
+					if (key != null) { //The loaded manager is the same
+						getLogger().warning("Dimension manager already loaded with key " + key + "! Skipping");
+						continue;
+					}
+				}
 				//Replace existing dimension manager, correctly setting the ID up (which is -1 for default worlds...)
-				((RegistryMaterials<DimensionManager>) console.customRegistry.a()).a(OptionalInt.empty(), dimManResKey, dimensionmanager, Lifecycle.stable());
+				dimRegistry.a(OptionalInt.empty(), dimManResKey, dimensionmanager, Lifecycle.stable());
 
 				var worldloadlistener = console.worldLoadListenerFactory.create(11);
 
@@ -100,7 +108,9 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 						worlddata, worldKey, dimensionmanager, worldloadlistener, chunkgenerator,
 						false, //isDebugWorld
 						BiomeManager.a(worlddata.getGeneratorSettings().getSeed()), //Biome seed
-						spawners, false, org.bukkit.World.Environment.NORMAL, null);
+						spawners,
+						true, //Update world time
+						org.bukkit.World.Environment.NORMAL, null);
 
 				if (Bukkit.getWorld(name.toLowerCase(Locale.ENGLISH)) == null) {
 					getLogger().warning("Failed to load custom dimension " + name);
