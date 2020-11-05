@@ -2,11 +2,12 @@ package buttondevteam.customdimensions;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import com.mojang.serialization.Lifecycle;
-import net.minecraft.server.v1_16_R2.*;
+import net.minecraft.server.v1_16_R3.*;
 import org.bukkit.Bukkit;
 import org.bukkit.WorldType;
-import org.bukkit.craftbukkit.v1_16_R2.CraftServer;
+import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.WorldInitEvent;
 import org.bukkit.event.world.WorldLoadEvent;
@@ -19,6 +20,7 @@ import java.util.*;
 public class CustomDimensions extends JavaPlugin implements Listener {
 	@Override
 	public void onEnable() {
+		//Objects.requireNonNull(getCommand("cdload")).setExecutor(new CDCommand(this)); - dimensions aren't updated on /minecraft:reload
 		getLogger().info("Loading custom dimensions...");
 		try {
 			load();
@@ -28,7 +30,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		getLogger().info("Finished loading custom dimensions!");
 	}
 
-	private void load() throws Exception {
+	public void load() throws Exception {
 		var console = ((CraftServer) Bukkit.getServer()).getServer();
 		var field = console.getClass().getSuperclass().getDeclaredField("saveData");
 		field.setAccessible(true);
@@ -40,7 +42,16 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 
 		var convertable = Convertable.a(Bukkit.getWorldContainer().toPath());
 
+		if (!getConfig().contains("ignored")) {
+			getConfig().set("ignored", Lists.newArrayList("single_biome"));
+			saveConfig();
+		}
+		var ignored = getConfig().getStringList("ignored");
 		for (var dimEntry : dimensionRegistry.d()) {
+			if (ignored.contains(dimEntry.getKey().a().getKey())) {
+				getLogger().info(dimEntry.getKey() + " is on the ignore list");
+				continue;
+			}
 			try {
 				loadDimension(dimEntry.getKey(), dimEntry.getValue(), convertable, console, mainWorld);
 			} catch (Exception e) {
@@ -92,7 +103,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		worlddata.checkName(name);
 		worlddata.a(console.getServerModName(), console.getModded().isPresent());
 		if (console.options.has("forceUpgrade")) {
-			net.minecraft.server.v1_16_R2.Main.convertWorld(session, DataConverterRegistry.a(),
+			net.minecraft.server.v1_16_R3.Main.convertWorld(session, DataConverterRegistry.a(),
 					console.options.has("eraseCache"), () -> true,
 					worlddata.getGeneratorSettings().d().d().stream()
 							.map((entry2) -> ResourceKey.a(IRegistry.K, entry2.getKey().a()))
@@ -105,14 +116,11 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		var dimRegistry = ((RegistryMaterials<DimensionManager>) console.customRegistry.a());
 		{
 			var key = dimRegistry.getKey(dimensionmanager);
-			if (key != null) { //The loaded manager is the same
-				getLogger().warning("Dimension manager already loaded with key " + key + "! Skipping");
-				session.close();
-				return;
+			if (key == null) { //The loaded manager is different - different dimension type
+				//Replace existing dimension manager, correctly setting the ID up (which is -1 for default worlds...)
+				dimRegistry.a(OptionalInt.empty(), dimManResKey, dimensionmanager, Lifecycle.stable());
 			}
 		}
-		//Replace existing dimension manager, correctly setting the ID up (which is -1 for default worlds...)
-		dimRegistry.a(OptionalInt.empty(), dimManResKey, dimensionmanager, Lifecycle.stable());
 
 		var worldloadlistener = console.worldLoadListenerFactory.create(11);
 
