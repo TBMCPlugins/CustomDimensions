@@ -20,7 +20,6 @@ import java.util.*;
 public class CustomDimensions extends JavaPlugin implements Listener {
 	@Override
 	public void onEnable() {
-		//Objects.requireNonNull(getCommand("cdload")).setExecutor(new CDCommand(this)); - dimensions aren't updated on /minecraft:reload
 		getLogger().info("Loading custom dimensions...");
 		try {
 			load();
@@ -30,7 +29,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		getLogger().info("Finished loading custom dimensions!");
 	}
 
-	public void load() throws Exception {
+	private void load() throws Exception {
 		var console = ((CraftServer) Bukkit.getServer()).getServer();
 		var field = console.getClass().getSuperclass().getDeclaredField("saveData");
 		field.setAccessible(true);

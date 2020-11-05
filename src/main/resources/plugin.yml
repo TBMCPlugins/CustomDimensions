@@ -4,7 +4,3 @@ version: '1.4'
 api-version: '1.16'
 loadbefore:
   - Multiverse-Core
-#commands:
-#  cdload:
-#    description: Load custom dimensions that aren't loaded at the moment
-#    permission: customdimensions.load
