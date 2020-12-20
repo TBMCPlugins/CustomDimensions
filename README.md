@@ -1,4 +1,4 @@
-![Java CI with Maven](https://github.com/Kas-tle/CustomDimensions/workflows/Java%20CI%20with%20Maven/badge.svg)
+![Java CI with Maven](https://github.com/TBMCPlugins/CustomDimensions/workflows/Java%20CI%20with%20Maven/badge.svg)
 # CustomDimensions
 Custom dimension support for 1.16.4 Bukkit/Spigot/Paper servers
 

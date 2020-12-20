@@ -69,7 +69,9 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		ResourceKey<World> worldKey = ResourceKey.a(IRegistry.L, dimKey.a());
 		DimensionManager dimensionmanager = dimension.b();
 		ChunkGenerator chunkgenerator = dimension.c();
-		var name = dimKey.a().getKey();
+		String name = getConfig().getString("worldNames." + dimKey.a());
+		if (name == null)
+			name = dimKey.a().getKey();
 		if (Bukkit.getWorld(name) != null) {
 			getLogger().info(name + " already loaded");
 			return;
