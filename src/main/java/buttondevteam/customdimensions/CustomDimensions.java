@@ -5,12 +5,12 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Callables;
 import com.mojang.serialization.Lifecycle;
-import net.minecraft.server.v1_16_R2.*;
+import net.minecraft.server.v1_16_R3.*;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
 import org.bukkit.WorldType;
-import org.bukkit.craftbukkit.v1_16_R2.CraftServer;
+import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.WorldInitEvent;
 import org.bukkit.event.world.WorldLoadEvent;
@@ -117,7 +117,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 		worlddata.checkName(name);
 		worlddata.a(console.getServerModName(), console.getModded().isPresent());
 		if (console.options.has("forceUpgrade")) {
-			net.minecraft.server.v1_16_R2.Main.convertWorld(session, DataConverterRegistry.a(),
+			net.minecraft.server.v1_16_R3.Main.convertWorld(session, DataConverterRegistry.a(),
 					console.options.has("eraseCache"), () -> true,
 					worlddata.getGeneratorSettings().d().d().stream()
 							.map((entry2) -> ResourceKey.a(IRegistry.K, entry2.getKey().a()))
