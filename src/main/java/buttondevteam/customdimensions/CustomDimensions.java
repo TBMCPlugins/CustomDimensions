@@ -3,8 +3,11 @@ package buttondevteam.customdimensions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.Callables;
 import com.mojang.serialization.Lifecycle;
 import net.minecraft.server.v1_16_R3.*;
+import org.bstats.bukkit.Metrics;
+import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
 import org.bukkit.WorldType;
 import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
@@ -18,8 +21,11 @@ import java.io.IOException;
 import java.util.*;
 
 public class CustomDimensions extends JavaPlugin implements Listener {
+	private Metrics metrics;
+
 	@Override
 	public void onEnable() {
+		metrics = new Metrics(this, 10545);
 		getLogger().info("Loading custom dimensions...");
 		try {
 			load();
@@ -46,26 +52,33 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 			saveConfig();
 		}
 		var ignored = getConfig().getStringList("ignored");
+		int allCount = -3, loadedCount = 0, ignoredCount = 0; //-3: overworld, nether, end
 		for (var dimEntry : dimensionRegistry.d()) {
+			allCount++;
 			if (ignored.contains(dimEntry.getKey().a().getKey())) {
 				getLogger().info(dimEntry.getKey() + " is on the ignore list");
+				ignoredCount++;
 				continue;
 			}
 			try {
-				loadDimension(dimEntry.getKey(), dimEntry.getValue(), convertable, console, mainWorld);
+				if (loadDimension(dimEntry.getKey(), dimEntry.getValue(), convertable, console, mainWorld))
+					loadedCount++;
 			} catch (Exception e) {
 				getLogger().warning("Failed to load dimension " + dimEntry.getKey());
 				e.printStackTrace();
 			}
 		}
+		metrics.addCustomChart(new SimplePie("all_custom_dimensions", Callables.returning(allCount + "")));
+		metrics.addCustomChart(new SimplePie("loaded_custom_dimensions", Callables.returning(loadedCount + "")));
+		metrics.addCustomChart(new SimplePie("ignored_custom_dimensions", Callables.returning(ignoredCount + "")));
 	}
 
-	private void loadDimension(ResourceKey<WorldDimension> dimKey, WorldDimension dimension,
-	                           Convertable convertable, DedicatedServer console, org.bukkit.World mainWorld) throws IOException {
+	private boolean loadDimension(ResourceKey<WorldDimension> dimKey, WorldDimension dimension,
+	                              Convertable convertable, DedicatedServer console, org.bukkit.World mainWorld) throws IOException {
 		if (dimKey == WorldDimension.OVERWORLD //The default dimensions are already loaded
 				|| dimKey == WorldDimension.THE_NETHER
 				|| dimKey == WorldDimension.THE_END)
-			return;
+			return false;
 		ResourceKey<World> worldKey = ResourceKey.a(IRegistry.L, dimKey.a());
 		DimensionManager dimensionmanager = dimension.b();
 		ChunkGenerator chunkgenerator = dimension.c();
@@ -74,7 +87,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 			name = dimKey.a().getKey();
 		if (Bukkit.getWorld(name) != null) {
 			getLogger().info(name + " already loaded");
-			return;
+			return false;
 		}
 		getLogger().info("Loading " + name);
 		var session = convertable.new ConversionSession(name, dimKey) { //The original session isn't prepared for custom dimensions
@@ -135,6 +148,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 
 		if (Bukkit.getWorld(name.toLowerCase(Locale.ENGLISH)) == null) {
 			getLogger().warning("Failed to load custom dimension " + name);
+			return false;
 		} else {
 			console.initWorld(worldserver, worlddata, worlddata, worlddata.getGeneratorSettings());
 			worldserver.setSpawnFlags(true, true);
@@ -142,6 +156,7 @@ public class CustomDimensions extends JavaPlugin implements Listener {
 			Bukkit.getPluginManager().callEvent(new WorldInitEvent(worldserver.getWorld()));
 			console.loadSpawn(worldserver.getChunkProvider().playerChunkMap.worldLoadListener, worldserver);
 			Bukkit.getPluginManager().callEvent(new WorldLoadEvent(worldserver.getWorld()));
+			return true;
 		}
 	}
 }
