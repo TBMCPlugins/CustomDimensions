@@ -1,0 +1,7 @@
+name: CustomDimensions
+main: buttondevteam.customdimensions.CustomDimensions
+api-version: 1.14
+version: 1.17
+loadbefore:
+  - Multiverse-Core
+  - Hyperverse
